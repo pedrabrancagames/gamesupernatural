@@ -2,7 +2,7 @@
 
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { DeviceOrientationControls, PerspectiveCamera, Html, useGLTF } from '@react-three/drei';
-import { useEffect, useRef, useState, Suspense } from 'react';
+import { useEffect, useRef, useState, Suspense, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft, Crosshair } from 'lucide-react';
@@ -137,11 +137,39 @@ function CombatScene({ monsterId, weaponId, onAttackResult }: { monsterId: strin
         <>
             <ambientLight intensity={0.5} />
             <pointLight position={[10, 10, 10]} />
-            <PerspectiveCamera makeDefault position={[0, 1.6, 0]} />
-            <DeviceOrientationControls />
-            <MonsterModel id={monsterId} onHit={() => { }} hp={monsterHp} maxHp={maxHp} />
+            {/* Monster fixed in world space relative to origin */}
+            <group position={[0, 0, -5]}>
+                <MonsterModel id={monsterId} onHit={() => handleAttack()} hp={monsterHp} maxHp={maxHp} />
+            </group>
         </>
     );
+}
+
+// Utility to convert GPS delta to Meters (Approximate for small distances)
+function latLonToMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const R = 6378.137; // Radius of earth in KM
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const d = R * c;
+    return d * 1000; // Meters
+}
+
+function calculateOffset(startLat: number, startLng: number, currentLat: number, currentLng: number) {
+    // Simple flat earth projection for small areas
+    // X = Longitude (East-West), Z = Latitude (North-South, inverted in 3D usually)
+
+    const xDist = latLonToMeters(startLat, startLng, startLat, currentLng);
+    const zDist = latLonToMeters(startLat, startLng, currentLat, startLng);
+
+    // Determine direction
+    const x = currentLng > startLng ? xDist : -xDist;
+    const z = currentLat > startLat ? -zDist : zDist; // In 3D engine: -Z is Forward (North) typically
+
+    return { x, z };
 }
 
 export default function ARView({ monsterId }: { monsterId: string | null }) {
@@ -152,6 +180,11 @@ export default function ARView({ monsterId }: { monsterId: string | null }) {
     const [selectedItem, setSelectedItem] = useState<string | null>(loadout[0] || null);
     const [message, setMessage] = useState("");
     const router = useRouter();
+
+    // GPS State
+    const [startPos, setStartPos] = useState<{ lat: number, lng: number } | null>(null);
+    const [currentPos, setCurrentPos] = useState<{ lat: number, lng: number } | null>(null);
+    const [gpsError, setGpsError] = useState<string>("");
 
     const loadedItems = inventory.filter(i => loadout.includes(i.id));
 
@@ -168,17 +201,65 @@ export default function ARView({ monsterId }: { monsterId: string | null }) {
         }
     };
 
+    // Start GPS Tracking when AR starts
+    useEffect(() => {
+        if (!startAR) return;
+
+        if (!navigator.geolocation) {
+            setGpsError("Geolocalização não suportada.");
+            return;
+        }
+
+        const success = (pos: GeolocationPosition) => {
+            const { latitude, longitude } = pos.coords;
+            const newPos = { lat: latitude, lng: longitude };
+
+            // Set initial position once
+            setStartPos(prev => {
+                if (!prev) return newPos;
+                return prev;
+            });
+
+            // Update current
+            setCurrentPos(newPos);
+        };
+
+        const error = (err: GeolocationPositionError) => {
+            console.warn('GPS Error', err);
+            setGpsError("Sinal GPS fraco ou não autorizado.");
+        };
+
+        const id = navigator.geolocation.watchPosition(success, error, {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 5000
+        });
+
+        return () => navigator.geolocation.clearWatch(id);
+    }, [startAR]);
+
     const handleFire = () => {
         window.dispatchEvent(new Event('fire-weapon'));
     };
+
+    // Calculate Camera Position based on GPS
+    const cameraPosition = useMemo(() => {
+        if (!startPos || !currentPos) return [0, 1.6, 0] as [number, number, number];
+
+        const offset = calculateOffset(startPos.lat, startPos.lng, currentPos.lat, currentPos.lng);
+        // Note: We move the CAMERA, so if user walks NORTH (-Z in world), camera goes NORTH.
+        // The monster is at (0,0,-4). 
+
+        return [offset.x, 1.6, offset.z] as [number, number, number];
+    }, [startPos, currentPos]);
 
     if (!startAR) {
         return (
             <div className="flex flex-col items-center justify-center h-full z-50 relative bg-black/80 text-white p-8 text-center space-y-4">
                 <h2 className="text-xl font-bold">Modo AR</h2>
-                <p>Permita o acesso aos sensores.</p>
+                <p>Permita o acesso aos sensores e GPS.</p>
                 <Button onClick={requestAccess} size="lg" className="bg-red-600">Iniciar</Button>
-                <Link href="/home"><Button variant="outline" className="text-black">Voltar</Button></Link>
+                <Link href="/map"><Button variant="outline" className="text-black">Voltar</Button></Link>
             </div>
         );
     }
@@ -189,6 +270,17 @@ export default function ARView({ monsterId }: { monsterId: string | null }) {
 
             <div className="absolute inset-0 z-10 w-full h-full">
                 <Canvas>
+                    <ambientLight intensity={0.5} />
+                    <pointLight position={[10, 10, 10]} />
+
+                    {/* Camera is moved by GPS, rotated by DeviceOrientation */}
+                    <group position={cameraPosition}>
+                        <PerspectiveCamera makeDefault />
+                        <DeviceOrientationControls />
+                    </group>
+
+                    {/* Monster starts 5 meters "North" relative to start point - Rendered inside CombatScene for Logic */}
+
                     <CombatScene
                         monsterId={activeMonsterId}
                         weaponId={selectedItem}
@@ -207,10 +299,19 @@ export default function ARView({ monsterId }: { monsterId: string | null }) {
                 </Button>
             </div>
 
-            {/* DEBUG PANEL - REMOVER EM PRODUÇÃO */}
-            <div className="absolute top-4 right-4 z-50 bg-black/80 text-white p-2 text-xs font-mono rounded pointer-events-none">
-                <p>MonsterID: {activeMonsterId} {monsterId ? '(URL)' : '(Default)'}</p>
-                <p>Path: {MONSTERS.find(m => m.id === activeMonsterId)?.modelPath || 'N/A'}</p>
+            {/* ERROR / STATUS */}
+            {gpsError && (
+                <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 bg-red-900/80 text-white px-2 py-1 rounded text-xs">
+                    {gpsError}
+                </div>
+            )}
+
+            {/* DEBUG PANEL - ATUALIZADO */}
+            <div className="absolute top-4 right-4 z-50 bg-black/80 text-white p-2 text-xs font-mono rounded pointer-events-none text-right">
+                <p>ID: {activeMonsterId}</p>
+                <p>GPS: {currentPos ? `${currentPos.lat.toFixed(6)}, ${currentPos.lng.toFixed(6)}` : 'Waiting...'}</p>
+                <p>CamX: {cameraPosition[0].toFixed(2)}m</p>
+                <p>CamZ: {cameraPosition[2].toFixed(2)}m</p>
             </div>
 
             {/* Combat Log */}
