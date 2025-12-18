@@ -14,12 +14,14 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
-const db = getFirestore(app);
+const app = (!getApps().length && firebaseConfig.apiKey) ? initializeApp(firebaseConfig) : (getApps().length ? getApp() : undefined);
+
+// Export services, handling the case where app isn't initialized (e.g. during build without keys)
+const auth = app ? getAuth(app) : undefined;
+const db = app ? getFirestore(app) : undefined;
 
 let analytics;
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && app) {
     isSupported().then(yes => yes && (analytics = getAnalytics(app)));
 }
 

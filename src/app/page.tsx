@@ -32,7 +32,7 @@ export default function Home() {
             <span className="block text-xl font-normal text-primary tracking-widest mt-1">Web AR</span>
           </h1>
           <p className="mt-4 text-muted-foreground text-sm max-w-[80%] mx-auto">
-            Join the hunt. Track monsters in the real world using augmented reality.
+            Junte-se à caçada. Rastreie monstros no mundo real usando realidade aumentada.
           </p>
         </motion.div>
 
@@ -50,7 +50,7 @@ export default function Home() {
             </Link>
 
             <p className="text-xs text-muted-foreground">
-              Project Winchester • v0.1.0
+              Projeto Winchester • v0.1.0
             </p>
           </div>
         </motion.div>

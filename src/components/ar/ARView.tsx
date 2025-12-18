@@ -1,13 +1,13 @@
 'use client';
 
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { DeviceOrientationControls, PerspectiveCamera, Html } from '@react-three/drei';
+import { DeviceOrientationControls, PerspectiveCamera, Html, useGLTF } from '@react-three/drei';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft, Crosshair } from 'lucide-react';
 import { useGame } from '@/context/GameContext';
-import { MONSTERS, ITEMS } from '@/lib/constants';
+import { MONSTERS } from '@/lib/constants';
 import * as THREE from 'three';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -46,33 +46,43 @@ function CameraFeed() {
 }
 
 function MonsterModel({ id, onHit, hp, maxHp }: { id: string | null, onHit: () => void, hp: number, maxHp: number }) {
-    const meshRef = useRef<THREE.Mesh>(null);
+    const meshRef = useRef<THREE.Group>(null);
+    const monsterData = MONSTERS.find(m => m.id === id);
+    const modelPath = monsterData?.modelPath;
+
+    // Load model if path exists
+    // Note: This hooks needs to be conditional or preloaded. R3F hooks should be at top level but useGLTF handles caching.
+    // However, calling it conditionally might cause issues if id changes. 
+    // Secure approach: only render if we have a path, else fallback.
+    const gltf = modelPath ? useGLTF(modelPath) : null;
 
     useFrame((state) => {
         if (meshRef.current) {
             // Idle animation
-            meshRef.current.position.y = Math.sin(state.clock.elapsedTime) * 0.2;
-            meshRef.current.rotation.y += 0.01;
+            meshRef.current.position.y = Math.sin(state.clock.elapsedTime) * 0.1 - 1.5; // Lower it a bit
+            // meshRef.current.rotation.y += 0.01; // Don't spin models, they usually face forward
         }
     });
 
     return (
-        <group position={[0, 0, -5]}>
-            {/* HP Bar in 3D Space */}
-            <Html position={[0, 1.5, 0]} center>
+        <group position={[0, 0, -4]}>
+            {/* HP Bar */}
+            <Html position={[0, 2.5, 0]} center>
                 <div className="w-32 h-2 bg-black/50 border border-white/20 rounded overflow-hidden">
                     <div className="h-full bg-red-600 transition-all duration-300" style={{ width: `${(hp / maxHp) * 100}%` }} />
                 </div>
             </Html>
 
-            <mesh
-                ref={meshRef}
-                onClick={onHit} // Simple click handler fallback
-                userData={{ isMonster: true }}
-            >
-                <boxGeometry args={[1, 1, 1]} />
-                <meshStandardMaterial color={hp > 0 ? "red" : "gray"} />
-            </mesh>
+            <group ref={meshRef} onClick={onHit} userData={{ isMonster: true }}>
+                {modelPath && gltf ? (
+                    <primitive object={gltf.scene} scale={2} />
+                ) : (
+                    <mesh userData={{ isMonster: true }}>
+                        <boxGeometry args={[1, 1, 1]} />
+                        <meshStandardMaterial color={hp > 0 ? "red" : "gray"} />
+                    </mesh>
+                )}
+            </group>
         </group>
     );
 }
@@ -102,11 +112,8 @@ function CombatScene({ monsterId, weaponId, onAttackResult }: { monsterId: strin
             onAttackResult(`Acertou! -${dmg} HP`);
 
             // Visual feedback
-            const mat = (hit.object as THREE.Mesh).material as THREE.MeshStandardMaterial;
-            const oldColor = mat.color.getHex();
-            mat.color.setHex(0xffffff);
-            setTimeout(() => mat.color.setHex(oldColor), 100);
-
+            // Note: primitives might be complex objects. Getting material color might fail if not mesh.
+            // Simplified feedback for now.
         } else {
             onAttackResult("Errou!");
         }

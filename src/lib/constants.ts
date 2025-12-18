@@ -1,8 +1,8 @@
 export const MONSTERS = [
-    { id: 'ghost', name: 'Fantasma Vingativo', type: 'ghost', weakness: ['salt', 'iron'], hp: 50 },
-    { id: 'demon', name: 'Demônio de Olhos Pretos', type: 'demon', weakness: ['trap', 'bible'], hp: 100 },
-    { id: 'werewolf', name: 'Lobisomem', type: 'werewolf', weakness: ['silver'], hp: 150 },
-    { id: 'vampire', name: 'Vampiro', type: 'vampire', weakness: ['dead_mans_blood', 'stake'], hp: 120 },
+    { id: 'ghost', name: 'Fantasma Vingativo', type: 'ghost', weakness: ['salt', 'iron'], hp: 50, modelPath: '/models/ghost.glb' },
+    { id: 'demon', name: 'Demônio de Olhos Pretos', type: 'demon', weakness: ['trap', 'bible'], hp: 100, modelPath: null },
+    { id: 'werewolf', name: 'Lobisomem', type: 'werewolf', weakness: ['silver'], hp: 150, modelPath: '/models/werewolf.glb' },
+    { id: 'vampire', name: 'Vampiro', type: 'vampire', weakness: ['dead_mans_blood', 'stake'], hp: 120, modelPath: null },
 ];
 
 export const ITEMS = [

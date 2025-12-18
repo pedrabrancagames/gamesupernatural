@@ -21,6 +21,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (!auth) {
+            console.warn("Firebase Auth not initialized. Check environment variables.");
+            setLoading(false);
+            return;
+        }
+
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             setUser(user);
             setLoading(false);
@@ -30,6 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const signInAnonymous = async () => {
+        if (!auth) return;
         try {
             await signInAnonymously(auth);
         } catch (error) {
