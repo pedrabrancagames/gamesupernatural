@@ -2,7 +2,7 @@
 
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { DeviceOrientationControls, PerspectiveCamera, Html, useGLTF } from '@react-three/drei';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft, Crosshair } from 'lucide-react';
@@ -45,37 +45,44 @@ function CameraFeed() {
     );
 }
 
+function AsyncMonster({ path }: { path: string }) {
+    const { scene } = useGLTF(path);
+    return <primitive object={scene} scale={2} />;
+}
+
 function MonsterModel({ id, onHit, hp, maxHp }: { id: string | null, onHit: () => void, hp: number, maxHp: number }) {
     const meshRef = useRef<THREE.Group>(null);
     const monsterData = MONSTERS.find(m => m.id === id);
     const modelPath = monsterData?.modelPath;
 
-    // Load model if path exists
-    // Note: This hooks needs to be conditional or preloaded. R3F hooks should be at top level but useGLTF handles caching.
-    // However, calling it conditionally might cause issues if id changes. 
-    // Secure approach: only render if we have a path, else fallback.
-    const gltf = modelPath ? useGLTF(modelPath) : null;
-
     useFrame((state) => {
         if (meshRef.current) {
-            // Idle animation
-            meshRef.current.position.y = Math.sin(state.clock.elapsedTime) * 0.1 - 1.5; // Lower it a bit
-            // meshRef.current.rotation.y += 0.01; // Don't spin models, they usually face forward
+            meshRef.current.position.y = Math.sin(state.clock.elapsedTime) * 0.1 - 1.5;
         }
     });
 
     return (
         <group position={[0, 0, -4]}>
-            {/* HP Bar */}
             <Html position={[0, 2.5, 0]} center>
-                <div className="w-32 h-2 bg-black/50 border border-white/20 rounded overflow-hidden">
-                    <div className="h-full bg-red-600 transition-all duration-300" style={{ width: `${(hp / maxHp) * 100}%` }} />
+                <div className="flex flex-col items-center gap-1">
+                    <div className="w-32 h-2 bg-black/50 border border-white/20 rounded overflow-hidden">
+                        <div className="h-full bg-red-600 transition-all duration-300" style={{ width: `${(hp / maxHp) * 100}%` }} />
+                    </div>
                 </div>
             </Html>
 
+            {/* Debug Info in World Space (Optional, better in HUD) */}
+
             <group ref={meshRef} onClick={onHit} userData={{ isMonster: true }}>
-                {modelPath && gltf ? (
-                    <primitive object={gltf.scene} scale={2} />
+                {modelPath ? (
+                    <Suspense fallback={
+                        <mesh>
+                            <boxGeometry args={[0.5, 0.5, 0.5]} />
+                            <meshStandardMaterial color="yellow" />
+                        </mesh>
+                    }>
+                        <AsyncMonster path={modelPath} />
+                    </Suspense>
                 ) : (
                     <mesh userData={{ isMonster: true }}>
                         <boxGeometry args={[1, 1, 1]} />
@@ -196,6 +203,12 @@ export default function ARView({ monsterId }: { monsterId: string | null }) {
                 <Button variant="ghost" size="icon" className="bg-black/50 text-white rounded-full" onClick={() => router.back()}>
                     <ArrowLeft />
                 </Button>
+            </div>
+
+            {/* DEBUG PANEL - REMOVER EM PRODUÇÃO */}
+            <div className="absolute top-4 right-4 z-50 bg-black/80 text-white p-2 text-xs font-mono rounded pointer-events-none">
+                <p>MonsterID: {monsterId || 'null'}</p>
+                <p>Path: {MONSTERS.find(m => m.id === monsterId)?.modelPath || 'N/A'}</p>
             </div>
 
             {/* Combat Log */}
