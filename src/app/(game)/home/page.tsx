@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 export default function HomePage() {
     const menuItems = [
-        { label: "Iniciar Caçada", href: "/ar", icon: Crosshair, color: "bg-red-900/40 text-red-500", border: "border-red-900" },
+        { label: "Iniciar Caçada", href: "/map", icon: Crosshair, color: "bg-red-900/40 text-red-500", border: "border-red-900" },
         { label: "Mapa Global", href: "/map", icon: Map, color: "bg-blue-900/40 text-blue-400", border: "border-blue-900" },
         { label: "Inventário", href: "/inventory", icon: BookOpen, color: "bg-amber-900/40 text-amber-500", border: "border-amber-900" },
         { label: "Bestiário", href: "/cases", icon: Skull, color: "bg-stone-800/60 text-stone-400", border: "border-stone-700" },

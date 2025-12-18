@@ -145,6 +145,8 @@ function CombatScene({ monsterId, weaponId, onAttackResult }: { monsterId: strin
 }
 
 export default function ARView({ monsterId }: { monsterId: string | null }) {
+    // Fallback: Se não houver ID (acesso direto ou link quebrado), usa o primeiro monstro para demonstração
+    const activeMonsterId = monsterId || MONSTERS[0].id;
     const [startAR, setStartAR] = useState(false);
     const { loadout, inventory } = useGame();
     const [selectedItem, setSelectedItem] = useState<string | null>(loadout[0] || null);
@@ -188,7 +190,7 @@ export default function ARView({ monsterId }: { monsterId: string | null }) {
             <div className="absolute inset-0 z-10 w-full h-full">
                 <Canvas>
                     <CombatScene
-                        monsterId={monsterId}
+                        monsterId={activeMonsterId}
                         weaponId={selectedItem}
                         onAttackResult={(msg) => {
                             setMessage(msg);
@@ -207,8 +209,8 @@ export default function ARView({ monsterId }: { monsterId: string | null }) {
 
             {/* DEBUG PANEL - REMOVER EM PRODUÇÃO */}
             <div className="absolute top-4 right-4 z-50 bg-black/80 text-white p-2 text-xs font-mono rounded pointer-events-none">
-                <p>MonsterID: {monsterId || 'null'}</p>
-                <p>Path: {MONSTERS.find(m => m.id === monsterId)?.modelPath || 'N/A'}</p>
+                <p>MonsterID: {activeMonsterId} {monsterId ? '(URL)' : '(Default)'}</p>
+                <p>Path: {MONSTERS.find(m => m.id === activeMonsterId)?.modelPath || 'N/A'}</p>
             </div>
 
             {/* Combat Log */}
